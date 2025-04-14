@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Details</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; display: flex; justify-content: center; align-items: center; height: 100vh;">
+
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); width: 400px; text-align: center;">
+        <h2 style="color: #333;">File Details</h2>
+
+        <p><strong>File Link:</strong></p>
+        <a id="fileLink" href="#" target="_blank" style="display: inline-block; padding: 8px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">
+            Loading...
+        </a>
+
+        <div style="margin-top: 20px;">
+            <input type="file" id="fileInput" style="display: block; margin: 10px auto;">
+            <button id="uploadButton" style="background: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                Update File
+            </button>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            const shareableLink = "{{ shareable_link }}";  // Get the shareable link from Django
+            console.log("Shareable Link:", shareableLink);
+
+            function getCSRFToken() {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.startsWith('csrftoken=')) {
+                            cookieValue = cookie.substring('csrftoken='.length, cookie.length);
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            const csrftoken = getCSRFToken();
+
+            $.get(`/api/file/${shareableLink}/`, function (data) {
+                $("#fileLink").attr("href", data.file_url).text("Download File");
+            });
+
+            $("#uploadButton").click(function () {
+                const file = $("#fileInput")[0].files[0];
+                if (!file) {
+                    alert("Please select a file to upload.");
+                    return;
+                }
+
+                let formData = new FormData();
+                formData.append("file", file);
+
+                $.ajax({
+                    url: `/api/file/${shareableLink}/`,
+                    type: "PUT",
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: { "X-CSRFToken": csrftoken },
+                    success: function (response) {
+                        alert("File updated successfully!");
+                        $("#fileLink").attr("href", response.file_url).text("Download File");
+                    },
+                    error: function () {
+                        alert("Error updating file. Please try again.");
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

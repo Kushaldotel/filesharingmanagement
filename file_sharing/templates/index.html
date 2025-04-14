@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Management</title>
+
+    <!-- AdminLTE CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome/css/font-awesome.min.css">
+
+    <style>
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f6f9;
+        }
+        .content-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 1200px; /* Increase max width for wider screens */
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            background-color: #ffffff;
+        }
+        .card-header {
+            font-size: 1.5rem;
+            text-align: center;
+        }
+        .upload-btn, .view-btn, .download-btn, .edit-btn, .delete-btn, .copy-btn {
+            margin: 5px;
+        }
+        table {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="content-wrapper mx-2">
+
+        <div class="container">
+
+            <!-- File Management Card -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3>File Management System</h3>
+                </div>
+                <div class="card-body">
+
+                    <!-- File Upload Form -->
+                    <form id="uploadForm" method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="fileInput">Upload File</label>
+                            <input type="file" name="file" id="fileInput" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-success upload-btn">Upload</button>
+                    </form>
+
+                </div>
+            </div>
+
+            <!-- Uploaded Files Table -->
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h4>Uploaded Files</h4>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped table-bordered">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Uploaded At</th>
+                                <th>Shareable Link</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fileList">
+                            {% for file in files %}
+                            <tr id="fileRow-{{ file.shareable_link }}">
+                                <td>{{ file.id }}</td>
+                                <td>{{ file.uploaded_at }}</td>
+                                <td>{{ file.shareable_link }}</td>
+                                <td>
+                                    <button class="btn btn-primary download-btn" onclick="downloadFile('{{ file.shareable_link }}')">
+                                        <i class="fa fa-download"></i> Download
+                                    </button>
+                                    <button class="btn btn-warning edit-btn" onclick="editFile('{{ file.shareable_link }}')">
+                                        <i class="fa fa-pencil"></i> Edit
+                                    </button>
+                                    <button class="btn btn-danger delete-btn" onclick="deleteFile('{{ file.shareable_link }}')">
+                                        <i class="fa fa-trash"></i> Delete
+                                    </button>
+                                    <button class="btn btn-info copy-btn" onclick="copyLink('{{ file.shareable_link }}')">
+                                        <i class="fa fa-copy"></i> Copy Link
+                                    </button>
+                                    <a href="{{ file.file.url }}" target="_blank">
+                                        <button class="btn btn-secondary view-btn">
+                                            <i class="fa fa-eye"></i> View File
+                                        </button>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center">No files found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div> <!-- /.container -->
+
+    </div> <!-- /.content-wrapper -->
+
+    <!-- AdminLTE JS -->
+    <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
+
+    <script>
+        function getCSRFToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+        }
+
+        document.getElementById("uploadForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            let formData = new FormData(this);
+
+            fetch("/api/upload/", {
+                method: "POST",
+                body: formData,
+                headers: {
+                    "X-CSRFToken": getCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert("File uploaded successfully!");
+                location.reload();  // Refresh the page to show the new file
+            })
+            .catch(error => console.error("Upload failed:", error));
+        });
+
+        function downloadFile(shareableLink) {
+            window.location.href = `/api/download/${shareableLink}/`;
+        }
+
+        function editFile(shareableLink) {
+            window.location.href = `/file/${shareableLink}/`;
+        }
+
+        function deleteFile(shareableLink) {
+            if (!confirm("Are you sure you want to delete this file?")) return;
+
+            fetch(`/api/delete/${shareableLink}/`, {
+                method: "DELETE",
+                headers: {
+                    "X-CSRFToken": getCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert("File deleted successfully!");
+                document.getElementById(`fileRow-${shareableLink}`).remove();
+            })
+            .catch(error => console.error("Error deleting file:", error));
+        }
+
+        function copyLink(shareableLink) {
+            const url = `127.0.0.1:8000/api/download/${shareableLink}/`;
+            navigator.clipboard.writeText(url)
+                .then(() => {
+                    alert("Download link copied to clipboard!");
+                })
+                .catch(error => {
+                    console.error("Error copying link:", error);
+                    alert("Failed to copy link.");
+                });
+        }
+    </script>
+
+</body>
+</html>
